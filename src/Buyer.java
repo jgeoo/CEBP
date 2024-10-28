@@ -1,28 +1,28 @@
-class Buyer implements Runnable {
-    private StockExchange stockExchange;
-    private String company;
-    private int quantity;
-    private double price;
+public class Buyer implements Runnable {
+    private final StockExchange stockExchange;
+    private Order order;
 
     public Buyer(StockExchange stockExchange, String company, int quantity, double price) {
         this.stockExchange = stockExchange;
-        this.company = company;
-        this.quantity = quantity;
-        this.price = price;
+        this.order = new Order(company, quantity, price);
     }
 
     @Override
     public void run() {
-       // while (true) {
+        // Place initial buy order
+        stockExchange.placeBuyOrder(order);
 
-            Order order = new Order(company, quantity, price);
-            stockExchange.placeBuyOrder(order);
+        // Simulate modification after some time
+        try {
+            Thread.sleep(1000);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
 
-         //   try {
-         //       Thread.sleep(3000);  // Pauză între acțiuni (simulează un delay de 3 secunde)
-         //   } catch (InterruptedException e) {
-         //       e.printStackTrace();
-         //   }
-       // }
+    }
+    public void modifyOrder(String company,int newQuantity, double newPrice) {
+        Order updatedOrder = new Order(company, newQuantity, newPrice);
+        stockExchange.updateOrder(updatedOrder);
+        System.out.println("Modified Sell Order for " + company + " to quantity: " + newQuantity + ", price: " + newPrice);
     }
 }
