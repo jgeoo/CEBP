@@ -19,9 +19,5 @@ public class Seller implements Runnable {
             Thread.currentThread().interrupt();
         }
     }
-    public void modifyOrder(String company,int newQuantity, double newPrice) {
-        Order updatedOrder = new Order(company, newQuantity, newPrice);
-        stockExchange.updateOrder(updatedOrder);
-        System.out.println("Modified Sell Order for " + company + " to quantity: " + newQuantity + ", price: " + newPrice);
-    }
+
 }
