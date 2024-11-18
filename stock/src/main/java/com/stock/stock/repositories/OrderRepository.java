@@ -8,5 +8,5 @@ import java.util.List;
 
 @Repository
 public interface OrderRepository extends JpaRepository<Order, Long> {
-    List<Order> findByCompanyAndIsBuyOrder(String company, boolean isBuyOrder);
+    List<Order> findByCompanyAndBuyOrder(String company, boolean isBuyOrder);
 }
