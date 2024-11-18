@@ -8,5 +8,6 @@ import java.util.List;
 
 @Repository
 public interface OrderRepository extends JpaRepository<Order, Long> {
-    List<Order> findByCompanyAndBuyOrder(String company, boolean isBuyOrder);
+    // Use 'IsBuyOrder' to match the field in the entity class
+    List<Order> findByCompanyAndIsBuyOrder(String company, boolean isBuyOrder);
 }

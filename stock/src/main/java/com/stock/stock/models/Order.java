@@ -7,7 +7,10 @@ import lombok.*;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
+@Setter
+@Getter
 @Builder
+@Table(name = "orders") // Table renamed to 'orders' to avoid SQL reserved keyword conflict
 public class Order {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

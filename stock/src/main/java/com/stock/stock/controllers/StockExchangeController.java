@@ -1,4 +1,4 @@
-package com.stock.stock.controller;
+package com.stock.stock.controllers;
 
 import com.stock.stock.models.Order;
 import com.stock.stock.models.Transaction;

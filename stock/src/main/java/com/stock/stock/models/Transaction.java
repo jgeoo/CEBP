@@ -8,6 +8,10 @@ import lombok.*;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
+@Setter
+@Getter
+@Table(name = "transactions")
+
 public class Transaction {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -15,4 +19,10 @@ public class Transaction {
     private String company;
     private int quantity;
     private double price;
+
+    public Transaction(String company, int quantity, double price) {
+        this.company = company;
+        this.quantity = quantity;
+        this.price = price;
+    }
 }
