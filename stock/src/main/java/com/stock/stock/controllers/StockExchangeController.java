@@ -33,4 +33,14 @@ public class StockExchangeController {
     public ResponseEntity<List<Transaction>> getTransactions() {
         return ResponseEntity.ok(stockExchangeService.getTransactions());
     }
+
+    @GetMapping("/buy-orders")
+    public ResponseEntity<List<Order>> getBuyOrders() {
+        return ResponseEntity.ok(stockExchangeService.getBuyOrders());
+    }
+
+    @GetMapping("/sell-orders")
+    public ResponseEntity<List<Order>> getSellOrders() {
+        return ResponseEntity.ok(stockExchangeService.getSellOrders());
+    }
 }

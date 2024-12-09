@@ -167,4 +167,12 @@ public class StockExchangeService {
         running = false;
         notifyMatcher();
     }
+
+    public List<Order> getBuyOrders() {
+        return orderRepository.findByIsBuyOrder(Boolean.TRUE);
+    }
+
+    public List<Order> getSellOrders() {
+        return orderRepository.findByIsBuyOrder(Boolean.FALSE);
+    }
 }
