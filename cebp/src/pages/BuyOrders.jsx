@@ -1,12 +1,13 @@
-import OrderForm from "../components/OrderForm.jsx";
-import { useState } from "react";
-import { Box, Button, Typography, Snackbar, Alert } from "@mui/material";
+import { useState, useEffect } from "react";
+import { Box, Button, Typography, Snackbar, Alert, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper } from "@mui/material";
 import axios from "axios";
+import OrderForm from "../components/OrderForm.jsx";
 
 export default function BuyOrders() {
     const [showForm, setShowForm] = useState(false);
-    const [message, setMessage] = useState(null); // Holds success or error message
-    const [severity, setSeverity] = useState("success"); // Controls snackbar color (success/error)
+    const [message, setMessage] = useState(null);
+    const [severity, setSeverity] = useState("success");
+    const [buyOrders, setBuyOrders] = useState([]);
 
     const toggleForm = () => {
         setShowForm(prev => !prev);
@@ -21,12 +22,12 @@ export default function BuyOrders() {
             });
             console.log("Buy Order Response:", response.data);
 
-            // Show success message
             setMessage("Successfully placed buy order!");
             setSeverity("success");
+
+            fetchBuyOrders();
         } catch (error) {
             console.error("Error submitting Buy Order:", error);
-            // Show error message
             setMessage("Failed to place buy order. Please try again.");
             setSeverity("error");
         }
@@ -36,16 +37,33 @@ export default function BuyOrders() {
         setMessage(null);
     };
 
+    const fetchBuyOrders = async () => {
+        try {
+            const response = await axios.get('http://localhost:8080/api/stock-exchange/buy-orders');
+            setBuyOrders(response.data);
+        } catch (error) {
+            console.error("Error fetching buy orders:", error);
+            setMessage("Failed to load buy orders.");
+            setSeverity("error");
+        }
+    };
+
+    useEffect(() => {
+        fetchBuyOrders();
+    }, []);
+
     return (
         <Box
             sx={{
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                height: '150vh',
+                minHeight: '100vh',
                 flexDirection: 'column',
+                padding: '20px',
             }}
         >
+            {/* Button to toggle buy order form */}
             <Box
                 sx={{
                     position: 'absolute',
@@ -71,7 +89,7 @@ export default function BuyOrders() {
             <Box
                 sx={{
                     textAlign: 'center',
-                    marginTop: '60px',
+                    marginTop: '250px',
                     width: '100%',
                 }}
             >
@@ -82,10 +100,42 @@ export default function BuyOrders() {
                     />
                 )}
 
-                <Typography>Buy Orders Available:</Typography>
+                <Typography variant="h4" sx={{ margin: '20px 0 20px 300px', textAlign: 'left'}}>Buy Order History:</Typography>
+
+                {/* Table displaying available buy orders */}
+                <TableContainer
+                    component={Paper}
+                    sx={{
+                        maxHeight: '300px',
+                        width: '60%',
+                        margin: '20px auto',
+                        padding: '10px',
+                        boxShadow: 3,
+                        borderRadius: 2,
+                    }}
+                >
+                    <Table stickyHeader>
+                        <TableHead>
+                            <TableRow>
+                                <TableCell sx={{ fontWeight: 'bold', textAlign: 'center' }}>Company</TableCell>
+                                <TableCell sx={{ fontWeight: 'bold', textAlign: 'center' }}>Quantity</TableCell>
+                                <TableCell sx={{ fontWeight: 'bold', textAlign: 'center' }}>Price</TableCell>
+                            </TableRow>
+                        </TableHead>
+                        <TableBody>
+                            {buyOrders.map(order => (
+                                <TableRow key={order.id}>
+                                    <TableCell sx={{ textAlign: 'center' }}>{order.company}</TableCell>
+                                    <TableCell sx={{ textAlign: 'center' }}>{order.quantity}</TableCell>
+                                    <TableCell sx={{ textAlign: 'center' }}>{order.price}</TableCell>
+                                </TableRow>
+                            ))}
+                        </TableBody>
+                    </Table>
+                </TableContainer>
             </Box>
 
-            {/* Snackbar for messages */}
+            {/* Snackbar for displaying messages */}
             <Snackbar
                 open={!!message}
                 autoHideDuration={4000}

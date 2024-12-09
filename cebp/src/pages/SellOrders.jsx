@@ -1,12 +1,13 @@
-import OrderForm from "../components/OrderForm.jsx";
-import { useState } from "react";
-import { Box, Button, Typography, Snackbar, Alert } from "@mui/material";
+import { useState, useEffect } from "react";
+import { Box, Button, Typography, Snackbar, Alert, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper } from "@mui/material";
 import axios from "axios";
+import OrderForm from "../components/OrderForm.jsx";
 
 export default function SellOrders() {
     const [showForm, setShowForm] = useState(false);
-    const [message, setMessage] = useState(null); // Holds success or error message
-    const [severity, setSeverity] = useState("success"); // Controls snackbar color (success/error)
+    const [message, setMessage] = useState(null);
+    const [severity, setSeverity] = useState("success");
+    const [sellOrders, setSellOrders] = useState([]);
 
     const toggleForm = () => {
         setShowForm(prev => !prev);
@@ -21,12 +22,12 @@ export default function SellOrders() {
             });
             console.log("Sell Order Response:", response.data);
 
-            // Show success message
             setMessage("Successfully placed sell order!");
             setSeverity("success");
+
+            fetchSellOrders();
         } catch (error) {
             console.error("Error submitting Sell Order:", error);
-            // Show error message
             setMessage("Failed to place sell order. Please try again.");
             setSeverity("error");
         }
@@ -36,14 +37,30 @@ export default function SellOrders() {
         setMessage(null);
     };
 
+    const fetchSellOrders = async () => {
+        try {
+            const response = await axios.get('http://localhost:8080/api/stock-exchange/sell-orders');
+            setSellOrders(response.data);
+        } catch (error) {
+            console.error("Error fetching sell orders:", error);
+            setMessage("Failed to load sell orders.");
+            setSeverity("error");
+        }
+    };
+
+    useEffect(() => {
+        fetchSellOrders();
+    }, []);
+
     return (
         <Box
             sx={{
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                height: '150vh',
+                minHeight: '100vh',
                 flexDirection: 'column',
+                padding: '20px',
             }}
         >
             <Box
@@ -71,7 +88,7 @@ export default function SellOrders() {
             <Box
                 sx={{
                     textAlign: 'center',
-                    marginTop: '60px',
+                    marginTop: '250px',
                     width: '100%',
                 }}
             >
@@ -82,10 +99,40 @@ export default function SellOrders() {
                     />
                 )}
 
-                <Typography>Existing Sell Orders</Typography>
+                <Typography variant="h3" sx={{ margin: '20px 0' }}>Existing Sell Orders</Typography>
+
+                <TableContainer
+                    component={Paper}
+                    sx={{
+                        maxHeight: '300px', // Control height
+                        width: '60%', // Restrict the width for responsiveness
+                        margin: '20px auto', // Center the table horizontally
+                        padding: '10px',
+                        boxShadow: 3, // Add some depth
+                        borderRadius: 2,
+                    }}
+                >
+                    <Table stickyHeader>
+                        <TableHead>
+                            <TableRow>
+                                <TableCell sx={{ fontWeight: 'bold', textAlign: 'center' }}>Company</TableCell>
+                                <TableCell sx={{ fontWeight: 'bold', textAlign: 'center' }}>Quantity</TableCell>
+                                <TableCell sx={{ fontWeight: 'bold', textAlign: 'center' }}>Price</TableCell>
+                            </TableRow>
+                        </TableHead>
+                        <TableBody>
+                            {sellOrders.map(order => (
+                                <TableRow key={order.id}>
+                                    <TableCell sx={{ textAlign: 'center' }}>{order.company}</TableCell>
+                                    <TableCell sx={{ textAlign: 'center' }}>{order.quantity}</TableCell>
+                                    <TableCell sx={{ textAlign: 'center' }}>{order.price}</TableCell>
+                                </TableRow>
+                            ))}
+                        </TableBody>
+                    </Table>
+                </TableContainer>
             </Box>
 
-            {/* Snackbar for messages */}
             <Snackbar
                 open={!!message}
                 autoHideDuration={4000}
