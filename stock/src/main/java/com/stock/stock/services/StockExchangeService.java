@@ -2,8 +2,12 @@ package com.stock.stock.services;
 
 import com.stock.stock.models.Order;
 import com.stock.stock.models.Transaction;
+import com.stock.stock.models.User;
+import com.stock.stock.models.dto.OrderDto;
 import com.stock.stock.repositories.OrderRepository;
 import com.stock.stock.repositories.TransactionRepository;
+import com.stock.stock.repositories.UserRepository;
+import jakarta.annotation.PostConstruct;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import com.stock.stock.utils.OrderLockManager;
@@ -23,7 +27,8 @@ public class StockExchangeService {
     @Autowired
     private TransactionRepository transactionRepository;
 
-    // Thread-safe maps for buy and sell orders
+    @Autowired
+    private UserRepository userRepository;
     private final Map<String, TreeMap<Double, Queue<Order>>> buyOrders = new ConcurrentHashMap<>();
     private final Map<String, TreeMap<Double, Queue<Order>>> sellOrders = new ConcurrentHashMap<>();
 
@@ -33,38 +38,89 @@ public class StockExchangeService {
 
     private final OrderLockManager lockManager = new OrderLockManager();
 
-    public StockExchangeService() {
+    @PostConstruct
+    public void initMatcherThread() {
         // Start a background thread to process matches
         Thread matcherThread = new Thread(this::runMatcher);
         matcherThread.start();
     }
 
-    public void placeBuyOrder(Order order) {
+
+    public void placeBuyOrder(OrderDto orderDto, Long userId) {
+        // Convert OrderDto to Order entity
+        Order order = new Order();
+        order.setCompany(orderDto.getCompany());
+        order.setQuantity(orderDto.getQuantity());
+        order.setPrice(orderDto.getPrice());
         order.setBuyOrder(true);
-        orderRepository.save(order); // Save order to database
+
+
+        // Fetch the user by userId
+        Optional<User> user = userRepository.findById(userId);
+        if (user.isPresent()) {
+            order.setUser(user.get()); // Set the user in the Order entity
+        } else {
+            throw new RuntimeException("User not found with ID: " + userId);
+        }
+
+        // Save the order to the database
+        orderRepository.save(order);
+
+        // Add the order to the in-memory buy orders
         buyOrders
                 .computeIfAbsent(order.getCompany(), k -> new TreeMap<>(Collections.reverseOrder())) // Descending order
                 .computeIfAbsent(order.getPrice(), k -> new ConcurrentLinkedQueue<>())
                 .offer(order);
+
         System.out.println("Placed Buy Order: " + order);
+
+        // Notify matcher to match orders
         notifyMatcher();
     }
 
-    public void placeSellOrder(Order order) {
-        order.setBuyOrder(false);
-        orderRepository.save(order); // Save order to database
+
+    public void placeSellOrder(OrderDto orderDto, Long userId) {
+        // Convert OrderDto to Order entity
+        Order order = new Order();
+        order.setCompany(orderDto.getCompany());
+        order.setQuantity(orderDto.getQuantity());
+        order.setPrice(orderDto.getPrice());
+        order.setBuyOrder(false); // It's a sell order
+
+        // Fetch the user by userId
+        Optional<User> user = userRepository.findById(userId);
+        if (user.isPresent()) {
+            order.setUser(user.get()); // Set the user in the Order entity
+        } else {
+            throw new RuntimeException("User not found with ID: " + userId);
+        }
+
+        // Save the order to the database
+        orderRepository.save(order);
+
+        // Add the order to the in-memory sell orders (ascending order by price)
         sellOrders
                 .computeIfAbsent(order.getCompany(), k -> new TreeMap<>()) // Ascending order
                 .computeIfAbsent(order.getPrice(), k -> new ConcurrentLinkedQueue<>())
                 .offer(order);
+
         System.out.println("Placed Sell Order: " + order);
+
+        // Notify matcher to match orders
         notifyMatcher();
+    }
+
+    public List<Order> getBuyOrders() {
+        return orderRepository.findByIsBuyOrder(Boolean.TRUE);
+    }
+
+    public List<Order> getSellOrders() {
+        return orderRepository.findByIsBuyOrder(Boolean.FALSE);
     }
 
     public List<Transaction> getTransactions() {
         return transactionRepository.findAll(); // Retrieve transactions from the database
     }
-
     private void notifyMatcher() {
         matchLock.lock();
         try {
@@ -93,25 +149,40 @@ public class StockExchangeService {
         do {
             matchFound = false;
 
-            for (String company : buyOrders.keySet()) {
-                TreeMap<Double, Queue<Order>> companyBuyOrders = buyOrders.get(company);
-                TreeMap<Double, Queue<Order>> companySellOrders = sellOrders.get(company);
+            // Fetch all buy and sell orders from the database
+            List<Order> buyOrdersFromDB = getBuyOrders();
+            List<Order> sellOrdersFromDB = getSellOrders();
 
-                if (companyBuyOrders == null || companySellOrders == null) continue;
+            // Group and sort orders for matching
+            Map<String, List<Order>> groupedBuyOrders = new HashMap<>();
+            Map<String, List<Order>> groupedSellOrders = new HashMap<>();
 
-                Map.Entry<Double, Queue<Order>> highestBuyEntry = companyBuyOrders.firstEntry();
-                Map.Entry<Double, Queue<Order>> lowestSellEntry = companySellOrders.firstEntry();
+            buyOrdersFromDB.forEach(order ->
+                    groupedBuyOrders.computeIfAbsent(order.getCompany(), k -> new ArrayList<>()).add(order)
+            );
+            sellOrdersFromDB.forEach(order ->
+                    groupedSellOrders.computeIfAbsent(order.getCompany(), k -> new ArrayList<>()).add(order)
+            );
 
-                if (highestBuyEntry == null || lowestSellEntry == null) continue;
+            for (String company : groupedBuyOrders.keySet()) {
+                List<Order> companyBuyOrders = groupedBuyOrders.get(company);
+                List<Order> companySellOrders = groupedSellOrders.getOrDefault(company, new ArrayList<>());
 
-                double buyPrice = highestBuyEntry.getKey();
-                double sellPrice = lowestSellEntry.getKey();
+                // Sort buy orders in descending price order
+                companyBuyOrders.sort((o1, o2) -> Double.compare(o2.getPrice(), o1.getPrice()));
 
-                if (buyPrice >= sellPrice) {
-                    Order buyOrder = highestBuyEntry.getValue().peek();
-                    Order sellOrder = lowestSellEntry.getValue().peek();
+                // Sort sell orders in ascending price order
+                companySellOrders.sort(Comparator.comparingDouble(Order::getPrice));
 
-                    if (buyOrder != null && sellOrder != null) {
+                if (companyBuyOrders.isEmpty() || companySellOrders.isEmpty()) continue;
+
+                // Try matching orders
+                while (!companyBuyOrders.isEmpty() && !companySellOrders.isEmpty()) {
+                    Order buyOrder = companyBuyOrders.get(0);
+                    Order sellOrder = companySellOrders.get(0);
+
+                    if (buyOrder.getPrice() >= sellOrder.getPrice()) {
+                        // Lock both orders
                         ReentrantLock sellLock = lockManager.getLock(sellOrder.getId());
                         ReentrantLock buyLock = lockManager.getLock(buyOrder.getId());
 
@@ -121,32 +192,25 @@ public class StockExchangeService {
                             int quantityTraded = Math.min(buyOrder.getQuantity(), sellOrder.getQuantity());
                             if (quantityTraded > 0) {
                                 // Save the transaction
-                                Transaction transaction = new Transaction(sellOrder.getCompany(), quantityTraded, sellPrice);
+                                Transaction transaction = new Transaction(sellOrder.getCompany(), quantityTraded, sellOrder.getPrice());
                                 transactionRepository.save(transaction);
-                                System.out.println("Executed Transaction: " + transaction);
 
                                 // Update order quantities
                                 sellOrder.setQuantity(sellOrder.getQuantity() - quantityTraded);
                                 buyOrder.setQuantity(buyOrder.getQuantity() - quantityTraded);
 
                                 if (sellOrder.getQuantity() <= 0) {
-                                    lowestSellEntry.getValue().poll();
-                                    if (lowestSellEntry.getValue().isEmpty()) {
-                                        companySellOrders.remove(sellPrice);
-                                    }
-                                    orderRepository.delete(sellOrder); // Delete fulfilled sell order
+                                    companySellOrders.remove(sellOrder);
+                                    orderRepository.delete(sellOrder);
                                 } else {
-                                    orderRepository.save(sellOrder); // Update partial sell order
+                                    orderRepository.save(sellOrder);
                                 }
 
                                 if (buyOrder.getQuantity() <= 0) {
-                                    highestBuyEntry.getValue().poll();
-                                    if (highestBuyEntry.getValue().isEmpty()) {
-                                        companyBuyOrders.remove(buyPrice);
-                                    }
-                                    orderRepository.delete(buyOrder); // Delete fulfilled buy order
+                                    companyBuyOrders.remove(buyOrder);
+                                    orderRepository.delete(buyOrder);
                                 } else {
-                                    orderRepository.save(buyOrder); // Update partial buy order
+                                    orderRepository.save(buyOrder);
                                 }
 
                                 matchFound = true;
@@ -157,6 +221,8 @@ public class StockExchangeService {
                             lockManager.releaseLock(sellOrder.getId());
                             lockManager.releaseLock(buyOrder.getId());
                         }
+                    } else {
+                        break; // No match is possible
                     }
                 }
             }
@@ -166,13 +232,5 @@ public class StockExchangeService {
     public void stopMatcher() {
         running = false;
         notifyMatcher();
-    }
-
-    public List<Order> getBuyOrders() {
-        return orderRepository.findByIsBuyOrder(Boolean.TRUE);
-    }
-
-    public List<Order> getSellOrders() {
-        return orderRepository.findByIsBuyOrder(Boolean.FALSE);
     }
 }

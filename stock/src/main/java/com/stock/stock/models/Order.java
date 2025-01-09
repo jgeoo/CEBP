@@ -1,5 +1,6 @@
 package com.stock.stock.models;
 
+import com.fasterxml.jackson.annotation.JsonBackReference;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -10,7 +11,7 @@ import lombok.*;
 @Setter
 @Getter
 @Builder
-@Table(name = "orders") // Table renamed to 'orders' to avoid SQL reserved keyword conflict
+@Table(name = "orders")
 public class Order {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -19,4 +20,8 @@ public class Order {
     private int quantity;
     private double price;
     private boolean isBuyOrder;
+
+    @ManyToOne
+    @JsonBackReference(value = "user-orders")  // Changed to match User class
+    private User user;
 }

@@ -1,5 +1,6 @@
 package com.stock.stock.models;
 
+import com.fasterxml.jackson.annotation.JsonBackReference;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -25,4 +26,7 @@ public class Transaction {
         this.quantity = quantity;
         this.price = price;
     }
+    @ManyToOne
+    @JsonBackReference( value = "transactions-user")
+    private User user;
 }
