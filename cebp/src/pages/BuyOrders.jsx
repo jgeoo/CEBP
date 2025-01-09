@@ -16,12 +16,30 @@ export default function BuyOrders() {
     };
 
     const handleBuySubmit = async (data) => {
+        const userId = parseInt(localStorage.getItem('id').replace(/"/g, ''));
         try {
             console.log("Submitting Buy Order:", data);
-            await axios.post('http://localhost:8080/api/stock-exchange/buy', {
-                ...data,
-                is_buy_order: true,
-            });
+
+            // Prepare the data object to include only order data (not userId)
+            const requestData = {
+                company: data.company,    // Changed from stockSymbol to company
+                quantity: Number(data.quantity),
+                price: Number(data.price),
+                
+            };
+    
+            // Make the POST request with the userId in the query parameter
+            const response = await axios.post(
+                'http://localhost:8080/api/stock-exchange/buy',  // Fixed URL with protocol
+                requestData,
+                {
+                    params: { userId },
+                    headers: {
+                        'Content-Type': 'application/json',
+                    }
+                }
+            );
+    
             setMessage("Successfully placed buy order!");
             setSeverity("success");
             fetchSellOrders();
@@ -31,6 +49,11 @@ export default function BuyOrders() {
             setSeverity("error");
         }
     };
+    
+    
+    
+    
+    
 
     const handleCloseSnackbar = () => {
         setMessage(null);

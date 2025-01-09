@@ -16,21 +16,40 @@ export default function SellOrders() {
     };
 
     const handleSellSubmit = async (data) => {
+        const userId = parseInt(localStorage.getItem('id').replace(/"/g, '')); // Retrieve userId from localStorage
         try {
             console.log("Submitting Sell Order:", data);
-            await axios.post('http://localhost:8080/api/stock-exchange/sell', {
-                ...data,
-                is_buy_order: false,
-            });
+    
+            // Prepare the data object to include only order data (not userId)
+            const requestData = {
+                company: data.company,    // Company name (from data)
+                quantity: Number(data.quantity),  // Quantity of stocks being sold
+                price: Number(data.price),  // Price at which the stock is being sold
+                  
+            };
+    
+            // Make the POST request with the userId in the query parameter
+            const response = await axios.post(
+                'http://localhost:8080/api/stock-exchange/sell',  // URL for placing a sell order
+                requestData,  // Data object for the sell order
+                {
+                    params: { userId },  // Pass userId as query parameter
+                    headers: {
+                        'Content-Type': 'application/json',  // Specify content type as JSON
+                    }
+                }
+            );
+    
             setMessage("Successfully placed sell order!");
             setSeverity("success");
-            fetchBuyOrders();
+            fetchBuyOrders(); // Fetch updated buy orders after placing the sell order
         } catch (error) {
             console.error("Error submitting Sell Order:", error);
             setMessage("Failed to place sell order. Please try again.");
             setSeverity("error");
         }
     };
+    
 
     const handleCloseSnackbar = () => {
         setMessage(null);
